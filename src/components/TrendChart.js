@@ -1,106 +1,104 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+// 💡 방금 파이 차트 그릴 때 썼던 recharts를 여기서도 사용합니다!
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
-function TrendChart({ symbol, apiKey }) {
+const TrendChart = ({ symbol, apiKey }) => {
   const [data, setData] = useState([]);
-  const [isMockData, setIsMockData] = useState(false); // 🌟 가짜 데이터인지 표시하는 상태
+  const [loading, setLoading] = useState(true);
 
+  // 💡 데이터 가져오기 로직
   useEffect(() => {
-    if (!symbol) return;
-    
-    const fetchHistoricalData = async () => {
-      setData([]); 
-      setIsMockData(false);
-
+    const fetchChartData = async () => {
+      setLoading(true);
       try {
+        // 최근 30일치 주가 흐름을 가져오기 위한 시간 계산 (UNIX 타임스탬프)
         const to = Math.floor(Date.now() / 1000);
         const from = to - (30 * 24 * 60 * 60); 
+        
+        // Finnhub의 '주식 캔들(Candle)' API를 호출합니다.
+        const res = await fetch(`https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${apiKey}`);
+        const json = await res.json();
 
-        const response = await axios.get(
-          `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${apiKey}`
-        );
-
-        if (response.data.s === 'ok') {
-          const formattedData = response.data.t.map((timestamp, index) => {
+        // API가 데이터를 정상적으로("ok") 주었을 때
+        if (json.s === "ok") {
+          // Recharts가 이해할 수 있는 형태의 배열로 데이터를 예쁘게 포장합니다.
+          const formattedData = json.t.map((timestamp, index) => {
             const date = new Date(timestamp * 1000);
             return {
-              date: `${date.getMonth() + 1}/${date.getDate()}`, 
-              price: response.data.c[index]
+              date: `${date.getMonth() + 1}/${date.getDate()}`, // 예: "3/15"
+              price: json.c[index] // 그 날의 종가(Close)
             };
           });
           setData(formattedData);
         } else {
-          // 서버가 응답은 했지만 데이터가 없다고 할 때 강제로 에러 발생!
-          throw new Error("No Data from API"); 
+          // 주말이거나 무료 API 한도 초과 시 빈 차트가 나오지 않게 방어
+          console.warn("데이터가 없거나 API 한도 초과입니다.");
+          setData([]); 
         }
       } catch (error) {
-        console.warn(`${symbol} API 호출 제한! 방어 로직 작동 🛡️ (시뮬레이션 데이터로 대체합니다)`);
-        setIsMockData(true); // 에러 발생 시 가짜 데이터 모드 ON!
-        
-        // 🌟 [우아한 실패 처리] 에러가 나면, 진짜 같은 30일치 주가 데이터를 수학적으로 만들어냄!
-        const mockData = [];
-        // 종목별로 대략적인 시작 가격 설정
-        let basePrice = symbol === 'VOO' ? 450 : symbol === 'QQQ' ? 400 : symbol === 'JEPI' ? 55 : 60;
-        
-        for (let i = 30; i >= 0; i--) {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          
-          // 매일 -2% ~ +2% 사이로 랜덤하게 주가가 변동하도록 계산
-          const randomChange = 1 + ((Math.random() - 0.5) * 0.04);
-          basePrice = basePrice * randomChange;
-
-          mockData.push({
-            date: `${date.getMonth() + 1}/${date.getDate()}`,
-            price: parseFloat(basePrice.toFixed(2))
-          });
-        }
-        setData(mockData);
+        console.error("차트 에러:", error);
+      } finally {
+        setLoading(false);
       }
     };
-    
-    // API 호출 횟수 제한을 조금이라도 피하기 위해 0.5초 쉬었다가 요청!
-    const timer = setTimeout(() => {
-      fetchHistoricalData();
-    }, 500);
 
-    return () => clearTimeout(timer);
-  }, [symbol, apiKey]);
+    fetchChartData();
+
+  // 🌟 [핵심] 빈 배열 [] 대신 [symbol]을 넣어서, 종목이 바뀔 때마다 재실행되게 만듭니다!
+  }, [symbol, apiKey]); 
+
+  // 로딩 중일 때 보여줄 화면
+  if (loading) {
+    return (
+      <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+        {symbol} 차트 불러오는 중... ⏳
+      </div>
+    );
+  }
+
+  // 데이터가 없을 때 보여줄 화면
+  if (data.length === 0) {
+    return (
+      <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-secondary)' }}>
+        해당 종목의 차트 데이터가 없습니다.
+      </div>
+    );
+  }
 
   return (
-    <div style={{
-      backgroundColor: 'var(--card-bg)', border: '1px solid var(--card-border)',
-      borderRadius: '8px', padding: '20px', marginTop: '20px', width: '100%', maxWidth: '800px', boxSizing: 'border-box'
-    }}>
-      <h3 style={{ color: 'var(--text-primary)', marginTop: 0, textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span>📈 <span style={{ color: '#c84a31' }}>{symbol}</span> 최근 30일 주가 흐름</span>
-        
-        {/* 🌟 가짜 데이터 모드일 때만 우측 상단에 작게 표시 */}
-        {isMockData && <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 'normal' }}>*API 초과: 시뮬레이션 데이터</span>}
-      </h3>
-      
-      {data.length > 0 ? (
-        <div style={{ width: '100%', height: 300 }}>
-          <ResponsiveContainer>
-            <LineChart data={data} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--card-border)" vertical={false} />
-              <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fill: 'var(--text-secondary)' }} />
-              <YAxis domain={['auto', 'auto']} stroke="var(--text-secondary)" tick={{ fill: 'var(--text-secondary)' }} />
-              <Tooltip 
-                contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)', color: 'var(--text-primary)', borderRadius: '8px' }} 
-                itemStyle={{ color: '#c84a31', fontWeight: 'bold' }}
-                formatter={(value) => [`$${value}`, "주가"]}
-              />
-              <Line type="monotone" dataKey="price" stroke="#c84a31" strokeWidth={3} dot={false} activeDot={{ r: 8 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      ) : (
-        <p style={{ color: 'var(--text-secondary)' }}>데이터 분석 및 차트 렌더링 중... ⏳</p>
-      )}
+    <div style={{ width: '100%', height: 320, backgroundColor: 'var(--bg-color)', borderRadius: '8px', padding: '10px 0' }}>
+      {/* 📈 꺾은선 차트 그리기 */}
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 20, right: 30, left: 0, bottom: 0 }}>
+          {/* 차트 배경의 흐린 격자무늬 */}
+          <CartesianGrid strokeDasharray="3 3" stroke="#444" vertical={false} />
+          
+          {/* X축 (날짜) */}
+          <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 12 }} />
+          
+          {/* Y축 (가격) */}
+          <YAxis domain={['auto', 'auto']} stroke="var(--text-secondary)" tick={{ fontSize: 12 }} tickFormatter={(value) => `$${value}`} />
+          
+          {/* 마우스 올렸을 때 나오는 말풍선 */}
+          <Tooltip 
+            formatter={(value) => [`$${value.toFixed(2)}`, '종가']}
+            labelStyle={{ color: '#000' }}
+            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+          />
+          
+          {/* 진짜 주가를 이어주는 꺾은선 */}
+          <Line 
+            type="monotone" // 선을 부드러운 곡선으로 만듦
+            dataKey="price" 
+            stroke="#e74c3c" // 선 색상 (빨간색)
+            strokeWidth={3} // 선 굵기
+            dot={false} // 데이터 포인트(점) 숨기기 (깔끔하게)
+            activeDot={{ r: 6 }} // 마우스 올린 곳만 점 크게 표시
+          />
+        </LineChart>
+      </ResponsiveContainer>
     </div>
   );
-}
+};
 
 export default TrendChart;

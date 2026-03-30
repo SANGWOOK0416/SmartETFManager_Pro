@@ -1,103 +1,64 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
+import React from 'react';
+import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
+const COLORS = ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6', '#34495e', '#1abc9c'];
 
-// 💡 종목별 대략적인 연간 배당 수익률 (Mock Data)
-const DIVIDEND_YIELDS = {
-  'VOO': 1.4,   // 약 1.4%
-  'QQQ': 0.6,   // 약 0.6%
-  'JEPI': 8.5,  // 고배당 약 8.5%
-  'TQQQ': 1.1   // 약 1.1%
-};
-
-function PortfolioChart({ portfolio, apiKey, refreshTrigger }) {
-  const [chartData, setChartData] = useState([]);
-  const [totalAsset, setTotalAsset] = useState(0);
-  const [totalDividend, setTotalDividend] = useState(0); // 👈 총 배당금 상태 추가!
-
-  useEffect(() => {
-    const fetchAllPrices = async () => {
-      try {
-        const promises = portfolio.map(item =>
-          axios.get(`https://finnhub.io/api/v1/quote?symbol=${item.symbol}&token=${apiKey}`)
-        );
-        const responses = await Promise.all(promises);
-
-        let assetSum = 0;
-        let dividendSum = 0; // 배당금 누적 변수
-
-        const newChartData = responses.map((res, index) => {
-          const currentPrice = res.data.c;
-          const symbol = portfolio[index].symbol;
-          const quantity = portfolio[index].quantity;
-          
-          const assetValue = currentPrice * quantity; 
-          
-          // 💸 내 자산 * (해당 종목 배당률 / 100) = 예상 연간 배당금
-          const expectedDividend = assetValue * (DIVIDEND_YIELDS[symbol] / 100);
-
-          assetSum += assetValue; 
-          dividendSum += expectedDividend; // 배당금 합치기!
-
-          return {
-            name: symbol,
-            value: parseFloat(assetValue.toFixed(2))
-          };
-        });
-
-        setChartData(newChartData);
-        setTotalAsset(assetSum);
-        setTotalDividend(dividendSum); // 상태 업데이트
-      } catch (error) {
-        console.error("차트 데이터를 가져오는데 실패했습니다.", error);
-      }
-    };
-
-    fetchAllPrices();
-  }, [portfolio, apiKey, refreshTrigger]);
+const PortfolioChart = ({ portfolio }) => {
+  if (!portfolio || portfolio.length === 0) {
+    return (
+      <div style={{ padding: '40px 20px', color: 'var(--text-secondary)', textAlign: 'center', backgroundColor: 'var(--bg-color)', borderRadius: '8px' }}>
+        텅~ 💸 <br/>
+        아직 매수한 종목이 없습니다.<br/>
+        위에서 첫 ETF를 매수해 보세요!
+      </div>
+    );
+  }
 
   return (
-    <div style={{ 
-      marginTop: '40px', padding: '30px', border: '1px solid #ddd', 
-      borderRadius: '15px', backgroundColor: '#fff', boxShadow: '0 4px 10px rgba(0,0,0,0.05)' 
-    }}>
-      {/* 💰 총 자산 & 💸 예상 배당금을 나란히 표시! */}
-      <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '10px', marginBottom: '20px' }}>
-        <h2 style={{ color: '#333', margin: 0 }}>
-          💰 총 자산: <span style={{ color: '#007bff' }}>${totalAsset.toFixed(2)}</span>
-        </h2>
-        <h2 style={{ color: '#333', margin: 0 }}>
-          💸 예상 연 배당금: <span style={{ color: '#28a745' }}>${totalDividend.toFixed(2)}</span>
-        </h2>
-      </div>
-      
-      <div style={{ display: 'flex', justifyContent: 'center' }}>
-        {chartData.length > 0 ? (
-          <PieChart width={550} height={400}>
-            <Pie
-              data={chartData}
-              cx="50%"
-              cy="50%"
-              outerRadius={110}
-              fill="#8884d8"
-              dataKey="value"
-              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}
-            >
-              {chartData.map((entry, index) => (
-                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip formatter={(value) => `$${value}`} />
-            <Legend />
-          </PieChart>
-        ) : (
-          <p>데이터 분석 및 차트 렌더링 중... ⏳</p>
-        )}
-      </div>
+    // 💡 [수정됨] 차트 영역 높이를 글자가 나올 공간까지 고려해 살짝 높임 (320 -> 340)
+    <div style={{ width: '100%', height: 340, backgroundColor: 'var(--bg-color)', borderRadius: '8px', padding: '10px 0' }}>
+      <ResponsiveContainer width="100%" height="100%">
+        {/* 💡 [수정됨] 차트 전체에 상하좌우 여백(margin)을 듬뿍 주어서 라벨 글자가 잘리지 않게 함 */}
+        <PieChart margin={{ top: 20, right: 60, left: 60, bottom: 10 }}>
+          <Pie
+            data={portfolio}
+            cx="50%"
+            cy="50%"
+            innerRadius={60}
+            // 💡 [수정됨] 도넛의 바깥 반지름을 살짝 줄임 (90 -> 80)
+            // 도넛 크기를 줄이는 대신 글자가 놀 수 있는 여유 공간을 확보!
+            outerRadius={80}
+            paddingAngle={5}
+            dataKey="quantity"
+            nameKey="symbol"
+            labelLine={true} // 라벨과 조각을 잇는 선을 보여줌 (가독성 향상)
+            // 💡 [수정됨] 라벨 글자가 다크모드/라이트모드 상관없이 잘 보이도록 스타일 수정
+            label={({ symbol, percent }) => `${symbol} ${(percent * 100).toFixed(0)}%`}
+            // 라벨 스타일을 차트 컴포넌트 내부 색상으로 고정
+            labelStyle={{ fill: 'var(--text-primary)', fontSize: '0.85rem' }}
+          >
+            {portfolio.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          
+          <Tooltip 
+            formatter={(value, name) => [`${value}주`, `${name}`]} 
+            allowEscapeViewBox={{ x: true, y: true }} 
+            contentStyle={{ 
+              borderRadius: '8px', 
+              border: 'none', 
+              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+              whiteSpace: 'nowrap',
+              color: '#333'
+            }}
+          />
+          
+          <Legend verticalAlign="bottom" height={36}/>
+        </PieChart>
+      </ResponsiveContainer>
     </div>
   );
-}
+};
 
 export default PortfolioChart;
