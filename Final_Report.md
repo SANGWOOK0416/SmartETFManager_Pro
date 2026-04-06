@@ -55,6 +55,7 @@ flowchart LR
     UC3 <--> API
     UC4 <--> API
     UC2_1 <--> API
+```
 
 ### 2.3. REST API 명세서 (내부 서버)
 | Method | Endpoint | Description |
@@ -89,6 +90,7 @@ sequenceDiagram
     Node->>Node: 평단가 및 실시간 손익/수익률 계산
     Node-->>React: 포트폴리오 + 실시간 데이터 병합 응답
     React-->>User: UI 렌더링 완료 (차트 및 테이블)
+```
 
 ### 3.2. 컴포넌트 구조 (Component Tree)
 ```text
