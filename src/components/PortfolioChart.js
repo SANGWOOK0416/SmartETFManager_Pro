@@ -1,59 +1,48 @@
 import React from 'react';
-import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 
-const COLORS = ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6', '#34495e', '#1abc9c'];
+const COLORS = ['#3498db', '#e74c3c', '#f1c40f', '#2ecc71', '#9b59b6', '#e67e22'];
 
 const PortfolioChart = ({ portfolio }) => {
-  if (!portfolio || portfolio.length === 0) {
+  // 💡 핵심 수정 1: 문자열을 숫자로 확실히 변환 (parseFloat)
+  // 💡 핵심 수정 2: 비중 = 수량 * 현재가 (자산 가치 기준으로 파이 조각을 나눔)
+  const chartData = portfolio.map(item => ({
+    name: item.symbol,
+    value: parseFloat(item.quantity || 0) * parseFloat(item.currentPrice || 0)
+  })).filter(item => item.value > 0); // 혹시 모를 0원짜리 데이터는 에러 방지를 위해 제외
+
+  if (!chartData || chartData.length === 0) {
     return (
-      <div style={{ padding: '40px 20px', color: 'var(--text-secondary)', textAlign: 'center', backgroundColor: 'var(--bg-color)', borderRadius: '8px' }}>
-        텅~ 💸 <br/>
-        아직 매수한 종목이 없습니다.<br/>
-        위에서 첫 ETF를 매수해 보세요!
+      <div style={{ height: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#888' }}>
+        데이터를 계산 중입니다...
       </div>
     );
   }
 
   return (
-    // 💡 [수정됨] 차트 영역 높이를 글자가 나올 공간까지 고려해 살짝 높임 (320 -> 340)
-    <div style={{ width: '100%', height: 340, backgroundColor: 'var(--bg-color)', borderRadius: '8px', padding: '10px 0' }}>
+    // 💡 부모 div에 확실한 height(300px)를 주어야 ResponsiveContainer가 작동합니다.
+    <div style={{ width: '100%', height: '300px' }}>
       <ResponsiveContainer width="100%" height="100%">
-        {/* 💡 [수정됨] 차트 전체에 상하좌우 여백(margin)을 듬뿍 주어서 라벨 글자가 잘리지 않게 함 */}
-        <PieChart margin={{ top: 20, right: 60, left: 60, bottom: 10 }}>
+        <PieChart>
           <Pie
-            data={portfolio}
+            data={chartData}
             cx="50%"
             cy="50%"
             innerRadius={60}
-            // 💡 [수정됨] 도넛의 바깥 반지름을 살짝 줄임 (90 -> 80)
-            // 도넛 크기를 줄이는 대신 글자가 놀 수 있는 여유 공간을 확보!
             outerRadius={80}
             paddingAngle={5}
-            dataKey="quantity"
-            nameKey="symbol"
-            labelLine={true} // 라벨과 조각을 잇는 선을 보여줌 (가독성 향상)
-            // 💡 [수정됨] 라벨 글자가 다크모드/라이트모드 상관없이 잘 보이도록 스타일 수정
-            label={({ symbol, percent }) => `${symbol} ${(percent * 100).toFixed(0)}%`}
-            // 라벨 스타일을 차트 컴포넌트 내부 색상으로 고정
-            labelStyle={{ fill: 'var(--text-primary)', fontSize: '0.85rem' }}
+            dataKey="value"
+            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
           >
-            {portfolio.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            {chartData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} stroke="none" />
             ))}
           </Pie>
-          
           <Tooltip 
-            formatter={(value, name) => [`${value}주`, `${name}`]} 
-            allowEscapeViewBox={{ x: true, y: true }} 
-            contentStyle={{ 
-              borderRadius: '8px', 
-              border: 'none', 
-              boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              whiteSpace: 'nowrap',
-              color: '#333'
-            }}
+            contentStyle={{ backgroundColor: '#1e1e1e', border: 'none', borderRadius: '8px', color: '#fff' }}
+            itemStyle={{ color: '#fff' }}
+            formatter={(value) => `$${value.toFixed(2)}`} // 툴팁에 달러($) 표시 추가
           />
-          
           <Legend verticalAlign="bottom" height={36}/>
         </PieChart>
       </ResponsiveContainer>
